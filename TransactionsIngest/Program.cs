@@ -28,13 +28,13 @@ var serviceProvider = services.BuildServiceProvider();
 //Run database migrations
 using (var scope = serviceProvider.CreateScope())
 {
-    var db = scope.serviceProvider.GetRequiredService<AppDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 }
 
 // Run ingestion
 using (var scope = serviceProvider.CreateScope())
 {
-    var ingestionService = scope.ServiceProvider.GetRequiredService<ingestionService>();
+    var ingestionService = scope.ServiceProvider.GetRequiredService<IngestionService>();
     await ingestionService.RunAsync();
 }

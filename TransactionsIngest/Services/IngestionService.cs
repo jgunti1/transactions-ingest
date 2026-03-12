@@ -1,5 +1,3 @@
-using System.Data.Common;
-using System.Transactions;
 using Microsoft.EntityFrameworkCore;
 using TransactionsIngest.Data;
 using TransactionsIngest.Models;
@@ -22,13 +20,17 @@ public class IngestionService
         var incoming = await _transactionService.FetchTransactionsAsync();
         var incomingList = incoming.ToList();
         var incomingIds = incomingList.Select(t => t.TransactionId).ToHashSet();
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+
+        // Wrap everything in a single DB transaction for idempotency
+        await using var dbTransaction = await _db.Database.BeginTransactionAsync();
 
         try
         {
             //Upsert each incoming transaction
             foreach (var dto in incomingList)
             {
-                var existing = await _db.Transactions.FirstOrDefaultAsync(t => t.transactionId == dto.TransactionId);
+                var existing = await _db.Transactions.FirstOrDefaultAsync(t => t.TransactionId == dto.TransactionId);
                 // for privacy only get the last 4 of the card
                 var cardLast4 = dto.CardNumber.Length  >= 4 
                     ? dto.CardNumber[^4..]
@@ -39,11 +41,11 @@ public class IngestionService
                     var newTransaction = new Transaction
                     {
                         TransactionId = dto.TransactionId,
-                        CardLast4 = dto.CardLast4,
+                        CardLast4 = cardLast4,
                         LocationCode = dto.LocationCode,
                         ProductName = dto.ProductName,
                         Amount = dto.Amount,
-                        TransationTime = dto.Timestamp,
+                        TransactionTime = dto.Timestamp,
                         Status = TransactionStatus.Active,
                         LastUpdated = DateTime.UtcNow
                     };
@@ -52,7 +54,7 @@ public class IngestionService
                     
                     _db.TransactionAudits.Add(new TransactionAudit
                     {
-                         TransactionInDoubtException = dto.TransactionId,
+                         TransactionId = dto.TransactionId,
                          FieldName = "All",
                          OldValue = string.Empty,
                          NewValue = $"Created: Amount={dto.Amount}, Product={dto.ProductName}",
@@ -97,10 +99,10 @@ public class IngestionService
             var toFinalize = await _db.Transactions.Where(t => t.TransactionTime < cutoff
                             && t.Status == TransactionStatus.Active).ToListAsync();
 
-            foreach (var transactions in toFinalize)
+            foreach (var transaction in toFinalize)
             {
-                Transaction.Status = TransactionStatus.Finalized;
-                Transaction.LastUpdated = DateTime.UtcNow;
+                transaction.Status = TransactionStatus.Finalized;
+                transaction.LastUpdated = DateTime.UtcNow;
             }
 
             await _db.SaveChangesAsync();
@@ -111,14 +113,14 @@ public class IngestionService
         catch (Exception ex)
         {
             await dbTransaction.RollbackAsync();
-            Console.WriteLine("$Ingestion failed: {ex.Message}");
+            Console.WriteLine($"Ingestion failed: {ex.Message}");
             throw;
         }
     }
-    private void DetectAndRecordChanges(Transaction existing, Transaction dto, string cardLast4)
+    private void DetectAndRecordChanges(Transaction existing, TransactionDto dto, string cardLast4)
     {
         if (existing.Amount != dto.Amount)
-            RecordChange(existing.TransactionId,"Amount",existing.Amount.ToString, dto.Amount.ToString());
+            RecordChange(existing.TransactionId,"Amount",existing.Amount.ToString(), dto.Amount.ToString());
 
         if (existing.ProductName != dto.ProductName)
             RecordChange(existing.TransactionId, "ProductName",existing.ProductName, dto.ProductName);

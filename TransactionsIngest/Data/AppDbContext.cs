@@ -1,17 +1,15 @@
-using System.Reflection.Metadata;
-using System.Transactions;
+using SystemTransaction = System.Transactions.Transaction;
 using Microsoft.EntityFrameworkCore;
-using TransactionsIngest.data;
 using TransactionsIngest.Models;
 
-namespace TransactionsIngest.data;
+namespace TransactionsIngest.Data;
 
-public class AppDbContext : AppDbContext
+public class AppDbContext : DbContext
 {
-    public DbSet<Transaction> Transactions {get; set;}
-    public DbSet<TransactionAudit> TransactionAudits {get; set;}
+    public DbSet<Transaction> Transactions { get; set; }
+    public DbSet<TransactionAudit> TransactionAudits { get; set; }
 
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {}
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,7 +22,7 @@ public class AppDbContext : AppDbContext
             entity.Property(e => e.Amount).HasColumnType("decimal(18,2)");
         });
 
-        modelBuilder.Entity<TransactionAudit>(EntityHandle =>
+        modelBuilder.Entity<TransactionAudit>(entity =>
         {
             entity.HasKey(e => e.Id);
         });
