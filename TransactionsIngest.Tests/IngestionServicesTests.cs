@@ -3,6 +3,7 @@ using SystemTransactionStatus = System.Transactions.TransactionStatus;
 using Microsoft.EntityFrameworkCore;
 using TransactionsIngest.Data;
 using TransactionsIngest.Services;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace TransactionsIngest.Tests;
 
@@ -10,7 +11,10 @@ public class IngestionServiceTests
 {
     private AppDbContext CreateInMemoryDb()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()).Options;
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+        .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+        .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+        .Options;
 
         return new AppDbContext(options);
     }
