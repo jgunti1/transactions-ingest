@@ -1,7 +1,7 @@
-using System.Transactions;
-using Microsoft.EntityFrameWorkCore;
-using TransactionsIngest.Data;
 using TransactionsIngest.Models;
+using SystemTransactionStatus = System.Transactions.TransactionStatus;
+using Microsoft.EntityFrameworkCore;
+using TransactionsIngest.Data;
 using TransactionsIngest.Services;
 
 namespace TransactionsIngest.Tests;
@@ -10,7 +10,7 @@ public class IngestionServiceTests
 {
     private AppDbContext CreateInMemoryDb()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()).Build();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()).Options;
 
         return new AppDbContext(options);
     }
@@ -38,7 +38,7 @@ public class IngestionServiceTests
         //arrange
         var db = CreateInMemoryDb();
         var mockService = new MockTransactionService();
-        var ingestionService = new IngestionServiceTests(db, mockService);
+        var ingestionService = new IngestionService(db, mockService);
 
         // first run - insert original data
         await ingestionService.RunAsync();
@@ -54,8 +54,8 @@ public class IngestionServiceTests
         });
 
         // act
-        var ingestionService2 = new IngestionServiceTests(db, updatedMock);
-        await ingestionService2.RunAsynbc();
+        var ingestionService2 = new IngestionService(db, updatedMock);
+        await ingestionService2.RunAsync();
 
         //assert
 
@@ -73,7 +73,7 @@ public class IngestionServiceTests
         // arrange
         var db = CreateInMemoryDb();
         var mockService = new MockTransactionService();
-        var ingestionService = new IngestionServiceTests(db, mockService);
+        var ingestionService = new IngestionService(db, mockService);
 
         // first run - insert all transactions
         await ingestionService.RunAsync();
@@ -85,7 +85,7 @@ public class IngestionServiceTests
             new(1004, "4111111111111111", "STO-03", "Keyboard", 45.00m, DateTime.UtcNow.AddHours(-10))
         });
         // act
-        var ingestionService2 = new IngestionServiceTests(db, updatedMock);
+        var ingestionService2 = new IngestionService(db, updatedMock);
         await ingestionService2.RunAsync();
 
         //assert
